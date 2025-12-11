@@ -60,9 +60,10 @@ omit = []
 
 [tool.mypy]
 python_version = "3.12"
-files = ["app", "lib", "manage.py"]
+files = ["."]
 strict = true
 plugins = ["mypy_django_plugin.main"]
+exclude = ["build", "dist", ".venv", ".devbox"]
 
 [[tool.mypy.overrides]]
 module = ["authlib.*"]

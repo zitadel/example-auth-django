@@ -1,17 +1,15 @@
-"""Jinja2 environment configuration for Django templates."""
+from typing import Any
 
-from __future__ import annotations
-
-from django.urls import reverse
 from jinja2 import Environment
+from django.urls import reverse
 
 
-def environment(**options: dict[str, any]) -> Environment:
+def environment(**options: Any) -> Environment:
     """Configure Jinja2 environment with Django URL resolver."""
-    env = Environment(**options)
+    env = Environment(autoescape=True, **options)
     env.globals.update(
         {
-            "url_for": lambda viewname, **kwargs: reverse(viewname, kwargs=kwargs),
+            "url_for": lambda route_name, **kwargs: reverse(route_name, kwargs=kwargs),
         }
     )
     return env

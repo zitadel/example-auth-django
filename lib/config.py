@@ -33,6 +33,8 @@ def must(name: str) -> str:
     """
     value = os.getenv(name)
     if not value:
+        if os.getenv("DJANGO_SETTINGS_MODULE"):
+            return ""
         raise RuntimeError(f"❌ Missing required env var {name}")
     return value
 

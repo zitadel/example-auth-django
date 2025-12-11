@@ -59,7 +59,6 @@ data_file = "build/coverage/.coverage"
 omit = []
 
 [tool.mypy]
-python_version = "3.12"
 files = ["."]
 strict = true
 plugins = ["mypy_django_plugin.main"]

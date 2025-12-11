@@ -1,3 +1,3 @@
-"""Spec package for Flask ZITADEL authentication."""
+"""Spec package for Django ZITADEL authentication."""
 
 from __future__ import annotations

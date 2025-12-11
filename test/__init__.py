@@ -1,3 +1,3 @@
-"""Test package for Flask ZITADEL authentication."""
+"""Test package for Django ZITADEL authentication."""
 
 from __future__ import annotations

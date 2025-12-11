@@ -7,7 +7,8 @@ import time
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
-from flask import Response, g, redirect, request, session, url_for
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
 
@@ -59,19 +60,19 @@ def require_auth(view: F) -> F:
     """Middleware that ensures the user is authenticated before accessing protected routes."""
 
     @wraps(view)
-    def wrapped(*args: Any, **kwargs: Any) -> Response:
-        auth_session = session.get("auth_session")
+    def wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        auth_session = request.session.get("auth_session")
 
         if not auth_session or not auth_session.get("user"):
-            callback_url = request.url
+            callback_url = request.get_full_path()
             logger.info("Unauthenticated access attempt, redirecting to signin")
-            return cast(Response, redirect(url_for("auth.signin", callbackUrl=callback_url, _external=False)))
+            return cast(HttpResponse, redirect(f"/auth/signin?callbackUrl={callback_url}"))
 
         if auth_session.get("error"):
             logger.warning("Session has error flag, redirecting to signin")
-            session.clear()
-            callback_url = request.url
-            return cast(Response, redirect(url_for("auth.signin", callbackUrl=callback_url, _external=False)))
+            request.session.clear()
+            callback_url = request.get_full_path()
+            return cast(HttpResponse, redirect(f"/auth/signin?callbackUrl={callback_url}"))
 
         expires_at = auth_session.get("expires_at")
         if expires_at and int(time.time()) >= expires_at:
@@ -79,16 +80,13 @@ def require_auth(view: F) -> F:
             refreshed_session = refresh_access_token(auth_session)
 
             if refreshed_session:
-                session["auth_session"] = refreshed_session
-                g.auth_session = refreshed_session
+                request.session["auth_session"] = refreshed_session
             else:
                 logger.error("Token refresh failed, clearing session")
-                session.clear()
-                callback_url = request.url
-                return cast(Response, redirect(url_for("auth.signin", callbackUrl=callback_url, _external=False)))
-        else:
-            g.auth_session = auth_session
+                request.session.clear()
+                callback_url = request.get_full_path()
+                return cast(HttpResponse, redirect(f"/auth/signin?callbackUrl={callback_url}"))
 
-        return cast(Response, view(*args, **kwargs))
+        return cast(HttpResponse, view(request, *args, **kwargs))
 
     return cast(F, wrapped)

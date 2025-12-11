@@ -1,14 +1,16 @@
-"""ZITADEL authentication routes using Authlib Flask integration."""
+"""ZITADEL authentication routes using Authlib Django integration."""
 
 from __future__ import annotations
 
 import logging
 import secrets
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
-from authlib.integrations.flask_client import OAuth
-from flask import Blueprint, Flask, redirect, render_template, request, session, url_for
+from authlib.integrations.django_client import OAuth
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_GET, require_POST
 
 from lib.config import config
 from lib.guard import require_auth
@@ -17,8 +19,6 @@ from lib.scopes import ZITADEL_SCOPES
 
 logger = logging.getLogger(__name__)
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
-
 oauth = OAuth()
 
 
@@ -26,9 +26,8 @@ def get_well_known_url(domain: str) -> str:
     return f"{domain}/.well-known/openid-configuration"
 
 
-def init_oauth(app: Flask) -> None:
-    """Initialize OAuth client with Flask app context."""
-    oauth.init_app(app)
+def init_oauth() -> None:
+    """Initialize OAuth client with Django configuration."""
     oauth.register(
         name="zitadel",
         client_id=config.ZITADEL_CLIENT_ID,
@@ -41,66 +40,72 @@ def init_oauth(app: Flask) -> None:
     )
 
 
-@auth_bp.route("/csrf")
-def csrf() -> dict[str, str]:
+init_oauth()
+
+
+@require_GET
+def csrf(request: HttpRequest) -> JsonResponse:
     """Generate CSRF token for form submissions."""
-    if "csrf_token" not in session:
-        session["csrf_token"] = secrets.token_urlsafe(32)
-    return {"csrfToken": session["csrf_token"]}
+    if "csrf_token" not in request.session:
+        request.session["csrf_token"] = secrets.token_urlsafe(32)
+    return JsonResponse({"csrfToken": request.session["csrf_token"]})
 
 
-@auth_bp.route("/signin")
-def signin() -> str:
+@require_GET
+def signin(request: HttpRequest) -> HttpResponse:
     """Render the sign-in page."""
-    error = request.args.get("error")
+    error = request.GET.get("error")
     providers = [
         {
             "id": "zitadel",
             "name": "ZITADEL",
-            "signinUrl": url_for("auth.signin_zitadel"),
+            "signinUrl": "/auth/signin/zitadel",
         }
     ]
-    return render_template(
+    return render(
+        request,
         "auth/signin.html",
-        providers=providers,
-        callbackUrl=request.args.get("callbackUrl") or config.ZITADEL_POST_LOGIN_URL,
-        message=get_message(error, "signin-error") if error else None,
+        {
+            "providers": providers,
+            "callbackUrl": request.GET.get("callbackUrl") or config.ZITADEL_POST_LOGIN_URL,
+            "message": get_message(error, "signin-error") if error else None,
+        },
     )
 
 
-@auth_bp.route("/signin/zitadel", methods=["POST"])
-def signin_zitadel() -> Any:
+@require_POST
+def signin_zitadel(request: HttpRequest) -> HttpResponse:
     """Initiate OAuth 2.0 authorization flow with PKCE."""
-    csrf_token = request.form.get("csrfToken")
-    stored_token = session.get("csrf_token")
+    csrf_token = request.POST.get("csrfToken")
+    stored_token = request.session.get("csrf_token")
 
     if not csrf_token or not stored_token or not secrets.compare_digest(csrf_token, stored_token):
         logger.warning("CSRF token validation failed")
-        return redirect(url_for("auth.signin", error="verification"))
+        return redirect("/auth/signin?error=verification")
 
-    session.pop("csrf_token", None)
-    session["post_login_url"] = request.form.get("callbackUrl", config.ZITADEL_POST_LOGIN_URL)
+    request.session.pop("csrf_token", None)
+    request.session["post_login_url"] = request.POST.get("callbackUrl", config.ZITADEL_POST_LOGIN_URL)
 
     redirect_uri = config.ZITADEL_CALLBACK_URL
     logger.info("Initiating OAuth authorization flow")
-    return oauth.zitadel.authorize_redirect(redirect_uri)
+    return cast(HttpResponse, oauth.zitadel.authorize_redirect(request, redirect_uri))
 
 
-@auth_bp.route("/callback")
-def callback() -> Any:
+@require_GET
+def callback(request: HttpRequest) -> HttpResponse:
     """Handle OAuth 2.0 callback from ZITADEL."""
     try:
-        token = oauth.zitadel.authorize_access_token()
+        token = oauth.zitadel.authorize_access_token(request)
 
-        userinfo = oauth.zitadel.userinfo()
+        userinfo = oauth.zitadel.userinfo(token=token)  # Add token parameter
 
-        old_session_data = dict(session)
-        session.clear()
+        old_session_data = dict(request.session)
+        request.session.clear()
         for key, value in old_session_data.items():
             if key in ("post_login_url",):
-                session[key] = value
+                request.session[key] = value
 
-        session["auth_session"] = {
+        request.session["auth_session"] = {
             "user": userinfo,
             "access_token": token.get("access_token"),
             "id_token": token.get("id_token"),
@@ -108,21 +113,21 @@ def callback() -> Any:
             "expires_at": token.get("expires_at"),
         }
 
-        post_login_url = session.pop("post_login_url", config.ZITADEL_POST_LOGIN_URL)
+        post_login_url = request.session.pop("post_login_url", config.ZITADEL_POST_LOGIN_URL)
         logger.info(f"Authentication successful for user: {userinfo.get('sub')}")
         return redirect(post_login_url)
 
     except Exception as e:
         logger.exception("Token exchange failed: %s", str(e))
-        return redirect(url_for("auth.error_page", error="callback"))
+        return redirect("/auth/error?error=callback")
 
 
-@auth_bp.route("/logout", methods=["POST"])
-def logout() -> Any:
+@require_POST
+def logout(request: HttpRequest) -> HttpResponse:
     """Initiate logout flow with ZITADEL."""
     try:
         logout_state = secrets.token_urlsafe(32)
-        session["logout_state"] = logout_state
+        request.session["logout_state"] = logout_state
 
         metadata = oauth.zitadel.load_server_metadata()
         end_session_endpoint = metadata.get("end_session_endpoint")
@@ -137,62 +142,62 @@ def logout() -> Any:
             logger.info("Initiating logout flow")
             return redirect(logout_url)
 
-        session.clear()
+        request.session.clear()
         return redirect(config.ZITADEL_POST_LOGOUT_URL)
 
     except Exception as e:
         logger.exception("Logout initiation failed: %s", str(e))
-        session.clear()
+        request.session.clear()
         return redirect(config.ZITADEL_POST_LOGOUT_URL)
 
 
-@auth_bp.route("/logout/callback")
-def logout_callback() -> Any:
+@require_GET
+def logout_callback(request: HttpRequest) -> HttpResponse:
     """Handle logout callback from ZITADEL with state validation."""
-    received_state = request.args.get("state")
-    stored_state = session.get("logout_state")
+    received_state = request.GET.get("state")
+    stored_state = request.session.get("logout_state")
 
     if received_state and stored_state and secrets.compare_digest(received_state, stored_state):
-        session.clear()
+        request.session.clear()
         logger.info("Logout successful")
-        return redirect(url_for("auth.logout_success"))
+        return redirect("/auth/logout/success")
 
     logger.warning("Logout state validation failed")
     reason = "Invalid or missing state parameter."
-    return redirect(url_for("auth.logout_error", reason=reason))
+    return redirect(f"/auth/logout/error?reason={reason}")
 
 
-@auth_bp.route("/logout/success")
-def logout_success() -> str:
+@require_GET
+def logout_success(request: HttpRequest) -> HttpResponse:
     """Display logout success page."""
-    return render_template("auth/logout/success.html")
+    return render(request, "auth/logout/success.html")
 
 
-@auth_bp.route("/logout/error")
-def logout_error() -> str:
+@require_GET
+def logout_error(request: HttpRequest) -> HttpResponse:
     """Display logout error page."""
-    reason = request.args.get("reason", "An unknown error occurred.")
-    return render_template("auth/logout/error.html", reason=reason)
+    reason = request.GET.get("reason", "An unknown error occurred.")
+    return render(request, "auth/logout/error.html", {"reason": reason})
 
 
-@auth_bp.route("/error")
-def error_page() -> str:
+@require_GET
+def error_page(request: HttpRequest) -> HttpResponse:
     """Display authentication error page."""
-    error_code = request.args.get("error")
+    error_code = request.GET.get("error")
     msg = get_message(error_code, "auth-error")
-    return render_template("auth/error.html", **msg)
+    return render(request, "auth/error.html", msg)
 
 
-@auth_bp.route("/userinfo")
+@require_GET
 @require_auth
-def userinfo() -> Any:
+def userinfo(request: HttpRequest) -> JsonResponse:
     """Fetch fresh user information from ZITADEL."""
-    auth_session = session.get("auth_session", {})
+    auth_session = request.session.get("auth_session", {})
     access_token = auth_session.get("access_token")
 
     if not access_token:
         logger.warning("Userinfo request without access token")
-        return {"error": "No access token available"}, 401
+        return JsonResponse({"error": "No access token available"}, status=401)
 
     try:
         metadata = oauth.zitadel.load_server_metadata()
@@ -204,15 +209,8 @@ def userinfo() -> Any:
 
         logger.info("Userinfo fetched successfully")
         result: dict[str, Any] = response.json()
-        return result
+        return JsonResponse(result)
 
     except Exception as e:
         logger.exception("Userinfo fetch failed: %s", str(e))
-        return {"error": "Failed to fetch user info"}, 500
-
-
-def register_auth_routes(app: Flask) -> None:
-    """Register authentication blueprint with Flask application."""
-    init_oauth(app)
-    app.register_blueprint(auth_bp)
-    logger.info("Authentication routes registered")
+        return JsonResponse({"error": "Failed to fetch user info"}, status=500)

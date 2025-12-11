@@ -8,7 +8,7 @@ from lib.config import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config.SESSION_SECRET
+SECRET_KEY = config.SESSION_SECRET or "test-secret-key-for-ci"
 
 DEBUG = config.PY_ENV != "production"
 

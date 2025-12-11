@@ -57,18 +57,19 @@ class Config:
         PY_ENV: Application environment ('development' or 'production')
     """
 
-    ZITADEL_DOMAIN: str = urlparse(must("ZITADEL_DOMAIN")).scheme + "://" + urlparse(must("ZITADEL_DOMAIN")).netloc
-    ZITADEL_CLIENT_ID: str = must("ZITADEL_CLIENT_ID")
-    ZITADEL_CLIENT_SECRET: str = must("ZITADEL_CLIENT_SECRET")
-    ZITADEL_CALLBACK_URL: str = must("ZITADEL_CALLBACK_URL")
-    ZITADEL_POST_LOGIN_URL: str = os.getenv("ZITADEL_POST_LOGIN_URL", "/profile")
-    ZITADEL_POST_LOGOUT_URL: str = os.getenv("ZITADEL_POST_LOGOUT_URL", "/")
-
-    SESSION_SECRET: str = must("SESSION_SECRET")
-    SESSION_DURATION: int = int(os.getenv("SESSION_DURATION", "3600"))
-
-    PORT: Optional[str] = os.getenv("PORT")
-    PY_ENV: Optional[str] = os.getenv("PY_ENV")
+    def __init__(self) -> None:
+        domain = must("ZITADEL_DOMAIN")
+        parsed = urlparse(domain)
+        self.ZITADEL_DOMAIN: str = f"{parsed.scheme}://{parsed.netloc}"
+        self.ZITADEL_CLIENT_ID: str = must("ZITADEL_CLIENT_ID")
+        self.ZITADEL_CLIENT_SECRET: str = must("ZITADEL_CLIENT_SECRET")
+        self.ZITADEL_CALLBACK_URL: str = must("ZITADEL_CALLBACK_URL")
+        self.ZITADEL_POST_LOGIN_URL: str = os.getenv("ZITADEL_POST_LOGIN_URL", "/profile")
+        self.ZITADEL_POST_LOGOUT_URL: str = os.getenv("ZITADEL_POST_LOGOUT_URL", "/")
+        self.SESSION_SECRET: str = must("SESSION_SECRET")
+        self.SESSION_DURATION: int = int(os.getenv("SESSION_DURATION", "3600"))
+        self.PORT: Optional[str] = os.getenv("PORT")
+        self.PY_ENV: Optional[str] = os.getenv("PY_ENV")
 
 
 config = Config()

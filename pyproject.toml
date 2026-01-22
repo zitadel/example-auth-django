@@ -33,17 +33,26 @@ Jinja2 = ">=3.0.0,<4.0.0"
 pytest = ">=7.2.1"
 pytest-cov = ">=4.0.0"
 pytest-django = ">=4.5.0"
-mypy = ">=1.5"
 ruff = ">=0.12.4"
 fawltydeps = "0.19.0"
-django-stubs = ">=5.1.0"
-types-authlib = "^1.6.5.20251005"
+ty = ">=0.0.4"
+django-stubs = "^5.2.9"
+
+[tool.ty.environment]
+python-version = "3.12"
+root = ["."]
+
+[tool.ty.src]
+respect-ignore-files = true
+include = ["app"]
+exclude = []
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
+cache_dir = ".pytest"
 DJANGO_SETTINGS_MODULE = "project.settings"
 testpaths = ["test", "spec"]
 python_files = "test_*.py *_spec.py"
@@ -59,16 +68,11 @@ junit_family = "xunit2"
 data_file = "build/coverage/.coverage"
 omit = []
 
-[tool.mypy]
-files = ["."]
-strict = true
-plugins = ["mypy_django_plugin.main"]
-exclude = ["build", "dist", ".venv", ".devbox"]
-
 [tool.django-stubs]
 django_settings_module = "project.settings"
 
 [tool.ruff]
+cache-dir = ".ruff"
 line-length = 130
 fix = true
 target-version = "py312"
@@ -83,10 +87,10 @@ ignore_unused = [
   "fawltydeps",
   "Jinja2",
   "requests",
-  "mypy",
   "pytest-cov",
   "pytest",
   "pytest-django",
   "ruff",
+  "ty",
   "django-stubs"
 ]

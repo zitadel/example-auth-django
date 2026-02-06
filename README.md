@@ -97,7 +97,7 @@ cd example-auth-django
 poetry install
 
 # 3. Start the development server
-poetry run python manage.py runserver localhost:3000
+make start
 ```
 
 The application will now be running at `http://localhost:3000`.

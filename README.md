@@ -23,7 +23,7 @@ Before you begin, ensure you have the following:
 #### System Requirements
 
 - Python (v3.12 or later is recommended)
-- Poetry package manager
+- uv package manager
 
 #### Account Setup
 
@@ -94,7 +94,7 @@ git clone git@github.com:zitadel/example-auth-django.git
 cd example-auth-django
 
 # 2. Install the project dependencies
-poetry install
+uv sync --group dev
 
 # 3. Start the development server
 make start

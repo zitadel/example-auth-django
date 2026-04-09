@@ -39,4 +39,4 @@ check:
 start: check
 	uv sync --group dev
 	uv run python manage.py migrate
-	uv run python manage.py runserver localhost:$(PORT)
+	uv run python manage.py runserver localhost:3000

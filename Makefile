@@ -2,7 +2,6 @@
 
 ifneq (,$(wildcard .env))
 include .env
-export PORT
 endif
 
 help:

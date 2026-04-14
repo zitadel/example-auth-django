@@ -39,6 +39,7 @@ You'll need a ZITADEL account and application configured. Follow the [ZITADEL do
 ### Configuration
 
 To run the application, you first need to copy the `.env.example` file to a new file named `.env` and fill in your ZITADEL application credentials.
+
 ```dotenv
 # Port number where your Django server will listen for incoming HTTP requests.
 # Change this if port 3000 is already in use on your system.
@@ -87,6 +88,7 @@ ZITADEL_POST_LOGOUT_URL="http://localhost:3000/auth/logout/callback"
 ### Installation and Running
 
 Follow these steps to get the application running:
+
 ```bash
 # 1. Clone the repository
 git clone git@github.com:zitadel/example-auth-django.git

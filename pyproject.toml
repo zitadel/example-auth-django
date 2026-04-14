@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.urls]
-repository = "https://github.com/zitadel/example-django-auth"
+repository = "https://github.com/zitadel/example-auth-django"
 
 [dependency-groups]
 dev = [
